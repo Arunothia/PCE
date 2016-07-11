@@ -1,2 +1,2 @@
 # PCE
-Propagation Complete Encodings for SAT Solvers
+Propagation Complete Encodings for SAT Solvers in Haskell
