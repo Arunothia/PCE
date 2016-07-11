@@ -43,14 +43,14 @@ debugPrint x = do
                 _ <- print x
                 return x
 
--- toCNF Function
--- Takes a DNF form and converts it to a CNF form.
+-- dnfToCNF Function
+-- Takes a DNF form and converts it to a CNF form using Tseytin transformation
 
-toCNF :: [[Int]] -> [[Int]]
-toCNF phi = phi -- TO BE COMPLETED
-
- 
-
+dnfToCNF :: Int -> [[Int]] -> [[Int]]
+dnfToCNF _ [] 	= []
+dnfToCNF n (x:xs) = ((n+1):map (* (-1)) x):rest
+	where 	rest = (foldl' f [] x) ++ (dnfToCNF (n+1) xs)
+		f lst l = lst ++ [(-(n+1)):[l]]	
 ------------------------------------------------------------------------------------------------------------
 
 -- In this code, we are exploring the following algorithm to estimate the Propagation Complete Encodings for SAT Solvers.
@@ -84,13 +84,16 @@ mus mu eRef = mu -- TO BE COMPLETED
 -- It outputs List of list of integers that represent the DNF of the Propagation complete form of eRef
 
 pce :: [[Int]] -> [[Int]] -> [[Int]]
-pce eRef phi = toCNF $pceHelper eRef phi []
+pce eRef phi = dnfToCNF n z
+	where z = pceHelper eRef phi []
+	      n = maximum (map maximum z)
 
 pceHelper :: [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper eRef (phi++muPrimeNeg) (e++muPrimeNeg)
 	where 	z 	   = isSolution mu
-		mu 	   = unsafePerformIO $ Picosat.solve $ toCNF phi 
+		n 	   = maximum (map maximum phi)
+		mu 	   = unsafePerformIO $ Picosat.solve $dnfToCNF n phi 
 		muPrime    = mus (fromSolution mu) eRef
 		muPrimeNeg = [map (* (-1)) muPrime]
