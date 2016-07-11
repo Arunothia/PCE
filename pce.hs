@@ -80,13 +80,13 @@ mus mu eRef = mu -- TO BE COMPLETED
 
 -- pce Function
 -- It takes List of list of integers as input that represent the CNF of eRef
--- It takes List of list of integers as input that represent the DNF of phi (as given in algorithm)
--- It outputs List of list of integers that represent the DNF of the Propagation complete form of eRef
+-- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
+-- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRef
 
 pce :: [[Int]] -> [[Int]] -> [[Int]]
-pce eRef phi = dnfToCNF n z
-	where z = pceHelper eRef phi []
-	      n = maximum (map maximum z)
+pce eRef phi = z
+	where z = pceHelper eRef (dnfToCNF n phi) []
+	      n = maximum (map maximum phi)
 
 pceHelper :: [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper eRef phi e
@@ -94,6 +94,6 @@ pceHelper eRef phi e
 	| otherwise = pceHelper eRef (phi++muPrimeNeg) (e++muPrimeNeg)
 	where 	z 	   = isSolution mu
 		n 	   = maximum (map maximum phi)
-		mu 	   = unsafePerformIO $ Picosat.solve $dnfToCNF n phi 
+		mu 	   = unsafePerformIO $ Picosat.solve phi 
 		muPrime    = mus (fromSolution mu) eRef
 		muPrimeNeg = [map (* (-1)) muPrime]
