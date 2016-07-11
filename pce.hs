@@ -32,7 +32,7 @@ isSolution (Solution _)  = True
 
 -- fromSolution Function
 
-fromSolution :: Solution a -> a
+fromSolution :: Solution -> [Int]
 fromSolution Unsatisfiable = error "Error: fromSolution detected no solution"
 fromSolution (Solution x)  = x
 
@@ -42,13 +42,6 @@ fromSolution (Solution x)  = x
 debugPrint x = do
                 _ <- print x
                 return x
-
--- negated Function
--- Negates CNF form and gives back the respective DNF form
--- or Negates DNF form and gives back the respective CNF form ( Using De morgan's Law)
-
-negated :: [[Int]] -> [[Int]]
-negated phi = map (map (* (-1))) phi
 
 -- toCNF Function
 -- Takes a DNF form and converts it to a CNF form.
@@ -75,9 +68,11 @@ toCNF phi = phi -- TO BE COMPLETED
 ------------------------------------------------------------------------------------------------------------
 
 -- mus Function
--- It takes mu (in CNF form)  and eRef (in CNF form)  as the input and gives mus(mu) (in CNF form)  as the output.
+-- It takes mu (list of integers)  and eRef (in CNF form)  as the input and gives mus(mu) (list of integers)  as the output.
+-- List of Integers representation of mu - 
+-- Example - [-1,2,0,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
-mus :: [[Int]] -> [[Int]] -> [[Int]]
+mus :: [Int] -> [[Int]] -> [Int]
 mus mu eRef = mu -- TO BE COMPLETED
 
 
@@ -89,10 +84,13 @@ mus mu eRef = mu -- TO BE COMPLETED
 -- It outputs List of list of integers that represent the DNF of the Propagation complete form of eRef
 
 pce :: [[Int]] -> [[Int]] -> [[Int]]
-pce eRef phi e
+pce eRef phi = toCNF $pceHelper eRef phi []
+
+pceHelper :: [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pceHelper eRef phi e
 	| (not z)   = e
-	| otherwise = pce eRef (phi++muPrimeNeg) (e++muPrimeNeg)
+	| otherwise = pceHelper eRef (phi++muPrimeNeg) (e++muPrimeNeg)
 	where 	z 	   = isSolution mu
 		mu 	   = unsafePerformIO $ Picosat.solve $ toCNF phi 
 		muPrime    = mus (fromSolution mu) eRef
-		muPrimeNeg = negated muPrime
+		muPrimeNeg = [map (* (-1)) muPrime]
