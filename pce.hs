@@ -68,32 +68,35 @@ dnfToCNF n (x:xs) = ((n+1):map (* (-1)) x):rest
 ------------------------------------------------------------------------------------------------------------
 
 -- mus Function
--- It takes mu (list of integers)  and eRef (in CNF form)  as the input and gives mus(mu) (list of integers)  as the output.
+-- It takes mu (list of integers), eRef (in CNF form) and list of interested variables as the input.
+-- It gives mus(mu) (list of integers)  as the output.
 -- List of Integers representation of mu - 
 -- Example - [-1,2,0,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
-mus :: [Int] -> [[Int]] -> [Int]
-mus mu eRef = mu -- TO BE COMPLETED
+mus :: [Int] -> [[Int]] -> [Int] -> [Int]
+mus mu eRef lst = mu -- TO BE COMPLETED
 
 
 ------------------------------------------------------------------------------------------------------------
 
 -- pce Function
+-- It takes List of Interested variables (Integer List).
 -- It takes List of list of integers as input that represent the CNF of eRef
 -- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
 -- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRef
 
-pce :: [[Int]] -> [[Int]] -> [[Int]]
-pce eRef phi = z
-	where z = pceHelper eRef (dnfToCNF n phi) []
-	      n = maximum (map maximum phi)
+pce :: [Int] -> [[Int]] -> [[Int]] -> [[Int]]
+pce lst eRef dnfPhi = z
+	where z = pceHelper lst eRef (dnfToCNF n dnfPhi) []
+	      n = maximum (map maximum phiAbs)
+	      phiAbs = map (map abs) dnfPhi
 
-pceHelper :: [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
-pceHelper eRef phi e
+pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pceHelper lst eRef phi e
 	| (not z)   = e
-	| otherwise = pceHelper eRef (phi++muPrimeNeg) (e++muPrimeNeg)
+	| otherwise = pceHelper lst eRef (phi++muPrimeNeg) (e++muPrimeNeg)
 	where 	z 	   = isSolution mu
 		n 	   = maximum (map maximum phi)
-		mu 	   = unsafePerformIO $ Picosat.solve phi 
-		muPrime    = mus (fromSolution mu) eRef
+		mu 	   = unsafePerformIO $Picosat.solve phi 
+		muPrime    = mus (fromSolution mu) eRef lst
 		muPrimeNeg = [map (* (-1)) muPrime]

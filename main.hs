@@ -28,7 +28,9 @@ main = do
         	inputERef <- getLine
         	let tmp  = splitOneOf "," inputERef
         	let eRef = (Prelude.map ((Prelude.map read).words) tmp)
-       		let phi  = map (map (* (-1))) eRef
-        	let answer = pce eRef phi
+       		let dnfPhi  = map (map (* (-1))) eRef
+		putStrLn "Enter the variables of interest (list of integers)"
+                lst <- readInt
+        	let answer = pce lst eRef dnfPhi
         	_  <- print answer
        		print $length answer
