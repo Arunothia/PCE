@@ -62,20 +62,40 @@ dnfToCNF n (x:xs) = ((n+1):map (* (-1)) x):rest
 		phi 	= and phi negation(mu')	 
 -}
 -- The above will be done using the Picosat SAT Solver as the pce function (for the main algorithm)
--- And mus function for performing Minimal Unsatisfiable Subsets as given in the paper -
+-- And mus function for finding  Minimal Unsatisfiable Subsets is done by taking reference of the paper -
 -- "Enumerating Infeasibility: Finding Multiple MUSes Quickly"
  
 ------------------------------------------------------------------------------------------------------------
+
+-- Shrink Function 
+-- It takes the original assignment and Eref as input
+-- It outputs the shrunk assignment that acts as the MUS
+
+shrink :: [Int] -> [[Int]] -> [Int]
+shrink mu eRef
+	| (cond muPrime) = mu
+	| otherwise 	 = shrink muPrime eRef
+	where 	cond []  = False
+		cond var = isSolution $unsafePerformIO $Picosat.solve $map (applyMuClause var) eRef
+		muPrime  = if (muPrimeList == []) then [] else (head muPrimeList)
+		muPrimeList       = Prelude.filter cond (map leaveOut mu)
+		leaveOut l        = Prelude.filter (==l) mu
+		applyMuClause m c = foldl' (f m) [] c
+		f _ [-1,1] _      = [-1,1]
+		f m tempLst l
+			| (isJust $findIndex (==l) m)    = [-1,1]
+			| (isJust $findIndex (==(-l)) m) = []
+			| otherwise 		     = (tempLst ++ [l])
 
 -- mus Function
 -- It takes mu (list of integers), eRef (in CNF form) and list of interested variables as the input.
 -- It gives mus(mu) (list of integers)  as the output.
 -- List of Integers representation of mu - 
--- Example - [-1,2,0,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
+-- Example - [-1,2,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
 mus :: [Int] -> [[Int]] -> [Int] -> [Int]
-mus mu eRef lst = mu -- TO BE COMPLETED
-
+mus mu eRef lst = shrink mu eRef
+	where onlyInterested tempLst l = if (isJust $findIndex (==abs(l)) lst) then (tempLst ++ [l]) else tempLst
 
 ------------------------------------------------------------------------------------------------------------
 
@@ -96,7 +116,7 @@ pceHelper lst eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper lst eRef (phi++muPrimeNeg) (e++muPrimeNeg)
 	where 	z 	   = isSolution mu
-		n 	   = maximum (map maximum phi)
 		mu 	   = unsafePerformIO $Picosat.solve phi 
 		muPrime    = mus (fromSolution mu) eRef lst
 		muPrimeNeg = [map (* (-1)) muPrime]
+
