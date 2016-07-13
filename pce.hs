@@ -47,9 +47,13 @@ debugPrint x = do
 -- Takes a DNF form and converts it to a CNF form using Tseytin transformation
 
 dnfToCNF :: Int -> [[Int]] -> [[Int]]
-dnfToCNF _ [] 	= []
-dnfToCNF n (x:xs) = ((n+1):map (* (-1)) x):rest
-	where 	rest = (foldl' f [] x) ++ (dnfToCNF (n+1) xs)
+dnfToCNF n dnf = cnf
+	where cnf = (dnfToCNFHelper n dnf) ++ [[(n+1)..(n+length(dnf))]]
+
+dnfToCNFHelper :: Int -> [[Int]] -> [[Int]]
+dnfToCNFHelper _ [] 	= []
+dnfToCNFHelper n (x:xs) = ((n+1):map (* (-1)) x):rest
+	where 	rest = (foldl' f [] x) ++ (dnfToCNFHelper (n+1) xs)
 		f lst l = lst ++ [(-(n+1)):[l]]	
 ------------------------------------------------------------------------------------------------------------
 
@@ -73,50 +77,56 @@ dnfToCNF n (x:xs) = ((n+1):map (* (-1)) x):rest
 
 shrink :: [Int] -> [[Int]] -> [Int]
 shrink mu eRef
+	| (mu == []) 	 = []
 	| (cond muPrime) = mu
 	| otherwise 	 = shrink muPrime eRef
-	where 	cond []  = False
-		cond var = isSolution $unsafePerformIO $Picosat.solve $map (applyMuClause var) eRef
+	where 	cond []  = True
+		cond var = isSolution $unsafePerformIO $Picosat.solve $eRefApplied var
+		eRefApplied var = if (check var >0) then [[1],[-1]] else map (applyMuClause var) eRef
+		check var	=  length $Prelude.filter (==[]) $map (applyMuClause var) eRef
 		muPrime  = if (muPrimeList == []) then [] else (head muPrimeList)
-		muPrimeList       = Prelude.filter cond (map leaveOut mu)
-		leaveOut l        = Prelude.filter (==l) mu
+		muPrimeList       = Prelude.filter (not.cond) (map leaveOut mu)
+		leaveOut l        = Prelude.filter (/=l) mu
 		applyMuClause m c = foldl' (f m) [] c
 		f _ [-1,1] _      = [-1,1]
 		f m tempLst l
 			| (isJust $findIndex (==l) m)    = [-1,1]
-			| (isJust $findIndex (==(-l)) m) = []
-			| otherwise 		     = (tempLst ++ [l])
+			| (isJust $findIndex (==(-l)) m) = tempLst
+			| otherwise 		     = (Data.List.union tempLst [l])
 
 -- mus Function
--- It takes mu (list of integers), eRef (in CNF form) and list of interested variables as the input.
+-- It takes mu (list of integers), eRef (in CNF form) and list of interested variables (1..n) as the input.
 -- It gives mus(mu) (list of integers)  as the output.
 -- List of Integers representation of mu - 
 -- Example - [-1,2,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
-mus :: [Int] -> [[Int]] -> [Int] -> [Int]
-mus mu eRef lst = shrink mu eRef
-	where onlyInterested tempLst l = if (isJust $findIndex (==abs(l)) lst) then (tempLst ++ [l]) else tempLst
+mus :: [Int] -> [[Int]] -> Int -> [Int]
+mus mu eRef n = shrink muNew eRef
+	where 	muNew = Prelude.filter (<=n) mu
 
 ------------------------------------------------------------------------------------------------------------
 
 -- pce Function
--- It takes List of Interested variables (Integer List).
+-- It takes List of Interested variables (1..n) by taking the value of n.
 -- It takes List of list of integers as input that represent the CNF of eRef
 -- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
 -- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRef
 
-pce :: [Int] -> [[Int]] -> [[Int]] -> [[Int]]
-pce lst eRef dnfPhi = z
-	where z = pceHelper lst eRef (dnfToCNF n dnfPhi) []
-	      n = maximum (map maximum phiAbs)
-	      phiAbs = map (map abs) dnfPhi
+pce :: Int -> [[Int]] -> [[Int]] -> [[Int]]
+pce n eRef dnfPhi = Prelude.filter (/=[]) z
+	where z = pceHelper n eRef (dnfToCNF n dnfPhi) []
 
-pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
-pceHelper lst eRef phi e
+pceHelper :: Int -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pceHelper n eRef phi e
 	| (not z)   = e
-	| otherwise = pceHelper lst eRef (phi++muPrimeNeg) (e++muPrimeNeg)
-	where 	z 	   = isSolution mu
-		mu 	   = unsafePerformIO $Picosat.solve phi 
-		muPrime    = mus (fromSolution mu) eRef lst
-		muPrimeNeg = [map (* (-1)) muPrime]
+	| otherwise = pceHelper n eRef phiNew eNew
+	where 	phiNew 	   = unsafePerformIO $debugPrint $if muPrimeNeg == [] then (Data.List.union phi muNeg) 
+									else Data.List.union phi muPrimeNeg
+		eNew	   = Data.List.union e muPrimeNeg
+		z 	   = isSolution muSol
+		muSol 	   = unsafePerformIO $debugPrint $unsafePerformIO $Picosat.solve phi 
+		muNeg	   = [map (* (-1)) mu]
+		muPrime    = unsafePerformIO $debugPrint $mus mu eRef n
+		muPrimeNeg = if (muPrime == []) then [] else [map (* (-1)) muPrime]
+		mu	   = fromSolution muSol
 
