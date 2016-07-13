@@ -120,13 +120,12 @@ pceHelper :: Int -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper n eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper n eRef phiNew eNew
-	where 	phiNew 	   = unsafePerformIO $debugPrint $if muPrimeNeg == [] then (Data.List.union phi muNeg) 
-									else Data.List.union phi muPrimeNeg
+	where 	phiNew 	   = if muPrimeNeg == [] then (Data.List.union phi muNeg) else Data.List.union phi muPrimeNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
-		muSol 	   = unsafePerformIO $debugPrint $unsafePerformIO $Picosat.solve phi 
+		muSol 	   = unsafePerformIO $Picosat.solve phi 
 		muNeg	   = [map (* (-1)) mu]
-		muPrime    = unsafePerformIO $debugPrint $mus mu eRef n
+		muPrime    = mus mu eRef n
 		muPrimeNeg = if (muPrime == []) then [] else [map (* (-1)) muPrime]
 		mu	   = fromSolution muSol
 
