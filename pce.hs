@@ -94,14 +94,23 @@ shrink mu eRef
 			| (isJust $findIndex (==(-l)) m) = tempLst
 			| otherwise 		     = (Data.List.union tempLst [l])
 
+-- marco Function
+-- It evaluates the full MUSes set using the MARCO-POLO Algorithm given in the paper.
+-- It takes the mapping (empty map initially), mu (the set of unsatisfiable constraints) and eRef as its inputs.
+-- It returns the MUSes Set as the output.
+
+marco :: [[Int]] -> [Int] -> [[Int]] -> [[Int]]
+marco map mu eRef = [shrink mu eRef] -- To be completed
+
+
 -- mus Function
 -- It takes mu (list of integers), eRef (in CNF form) and list of interested variables (1..n) as the input.
 -- It gives mus(mu) (list of integers)  as the output.
 -- List of Integers representation of mu - 
 -- Example - [-1,2,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
-mus :: [Int] -> [[Int]] -> Int -> [Int]
-mus mu eRef n = shrink muNew eRef
+mus :: [Int] -> [[Int]] -> Int -> [[Int]]
+mus mu eRef n = marco [] muNew eRef
 	where 	muNew = Prelude.filter (<=n) mu
 
 ------------------------------------------------------------------------------------------------------------
@@ -114,18 +123,18 @@ mus mu eRef n = shrink muNew eRef
 
 pce :: Int -> [[Int]] -> [[Int]] -> [[Int]]
 pce n eRef dnfPhi = Prelude.filter (/=[]) z
-	where z = pceHelper n eRef (dnfToCNF n dnfPhi) []
+	where z = pceHelper n eRef (unsafePerformIO $debugPrint $dnfToCNF n dnfPhi) []
 
 pceHelper :: Int -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper n eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper n eRef phiNew eNew
-	where 	phiNew 	   = if muPrimeNeg == [] then (Data.List.union phi muNeg) else Data.List.union phi muPrimeNeg
+	where 	phiNew 	   = Data.List.union phi muNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
 		muSol 	   = unsafePerformIO $Picosat.solve phi 
-		muNeg	   = [map (* (-1)) mu]
+		muNeg	   = unsafePerformIO $debugPrint [map (* (-1)) mu]
 		muPrime    = mus mu eRef n
-		muPrimeNeg = if (muPrime == []) then [] else [map (* (-1)) muPrime]
+		muPrimeNeg = map (map (* (-1))) muPrime
 		mu	   = fromSolution muSol
 
