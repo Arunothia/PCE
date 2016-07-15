@@ -143,37 +143,42 @@ marco mapping mu eRef muses
                 check var       = length $Prelude.filter (==[]) $map (applyMuClause var) eRef
 
 -- mus Function
--- It takes mu (list of integers), eRef (in CNF form) and list of interested variables (1..n) as the input.
+-- It takes mu (list of integers), eRef (in CNF form) and list of interested variables (list of integers) as the input.
 -- It gives mus(mu) (list of integers)  as the output.
 -- List of Integers representation of mu - 
 -- Example - [-1,2,-4] means (1,4) are assigned False and (3) is not assigned or is question and (2) is assigned True.
 
-musfun :: [Int] -> [[Int]] -> Int -> [[Int]]
-musfun mu eRef n = marco [] muNew eRef []
-	where 	muNew = Prelude.filter (<=n) mu
+musfun :: [Int] -> [[Int]] -> [Int] -> [[Int]]
+musfun mu eRef intLst = marco [] muNew eRef []
+	where 	muNew = Prelude.filter (/=0) $map onlyInterested mu
+		onlyInterested l
+			| (isJust $findIndex (==abs(l)) intLst) = l
+			| otherwise				= 0 
 
 ------------------------------------------------------------------------------------------------------------
 
 -- pce Function
--- It takes List of Interested variables (1..n) by taking the value of n.
+-- It takes List of Interested variables (list of integers).
 -- It takes List of list of integers as input that represent the CNF of eRef
 -- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
 -- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRef
 
-pce :: Int -> [[Int]] -> [[Int]] -> [[Int]]
-pce n eRef dnfPhi = Prelude.filter (/=[]) z
-	where z = pceHelper n eRef (dnfToCNF n dnfPhi) []
+pce :: [Int] -> [[Int]] -> [[Int]] -> [[Int]]
+pce intLst eRef dnfPhi = Prelude.filter (/=[]) z
+	where 	z      = pceHelper intLst eRef (dnfToCNF n dnfPhi) []
+		n      = maximum (map maximum phiAbs)
+		phiAbs = map (map abs) dnfPhi 
 
-pceHelper :: Int -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
-pceHelper n eRef phi e
+pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pceHelper intLst eRef phi e
 	| (not z)   = e
-	| otherwise = pceHelper n eRef phiNew eNew
+	| otherwise = pceHelper intLst eRef phiNew eNew
 	where 	phiNew 	   = Data.List.union phi muNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
 		muSol 	   = unsafePerformIO $Picosat.solve phi 
 		muNeg	   = [map (* (-1)) mu]
-		muPrime    = musfun mu eRef n
+		muPrime    = musfun mu eRef intLst
 		muPrimeNeg = map (map (* (-1))) muPrime
 		mu	   = fromSolution muSol
 

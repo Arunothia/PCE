@@ -24,14 +24,14 @@ main = do
 
 	else do
         	putStrLn "*** PCE Implemented in Haskell ***"
-        	putStrLn "Enter E_ref (Each clause is space seperated literals) and the clauses are seperated by ','"
-        	inputERef <- getLine
-        	let tmp  = splitOneOf "," inputERef
-        	let eRef = (Prelude.map ((Prelude.map read).words) tmp)
-       		let dnfPhi  = map (map (* (-1))) eRef
-		putStrLn "Enter the variables of interest (1..n) by entering the value of n (n>0)"
-                nInput <- getLine
-		let n = read nInput :: Int
-        	let answer = pce n eRef dnfPhi
+		putStrLn "Enter the variables of interest (list of integers)"
+                intLst <- readInt
+		putStrLn "Enter E_ref (Each clause is space seperated literals) and the clauses are seperated by ','"
+                inputERef <- getLine
+                let tmp  = splitOneOf "," inputERef
+                let eRef = (Prelude.map ((Prelude.map read).words) tmp)
+                let dnfPhi  = map (map (* (-1))) eRef
+
+        	let answer = pce intLst eRef dnfPhi
         	_  <- print answer
        		print $length answer
