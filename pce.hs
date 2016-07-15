@@ -89,15 +89,15 @@ f m tempLst l
 
 grow :: [Int] -> [[Int]] -> [Int] -> [Int]
 grow seed eRef mu
-        | (cond seedPrime) = seed
+        | (cond seedPrime) = if (cond seed) then error "Error: How come this seed?" else seed 
         | otherwise      = grow seedPrime eRef mu
         where   cond []  = True
                 cond var = not $isSolution $unsafePerformIO $Picosat.solve $eRefApplied var
                 eRefApplied var = if (check var >0) then [[1],[-1]] else map (applyMuClause var) eRef
-                check var       =  length $Prelude.filter (==[]) $map (applyMuClause var) eRef
-                seedPrime  = if (seedPrimeList == []) then [] else (head seedPrimeList)
-                seedPrimeList       = Prelude.filter (not.cond) $Prelude.filter (/=seed) (map addMore mu)
-                addMore l        = Data.List.union seed [l]
+                check var       = length $Prelude.filter (==[]) $map (applyMuClause var) eRef
+                seedPrime  	= if (seedPrimeList == []) then [] else (head seedPrimeList)
+                seedPrimeList   = Prelude.filter (not.cond) $Prelude.filter (/=seed) (map addMore mu)
+                addMore l       = Data.List.union seed [l]
 
 -- Shrink Function 
 -- It takes the original assignment and Eref as input
@@ -105,7 +105,6 @@ grow seed eRef mu
 
 shrink :: [Int] -> [[Int]] -> [Int]
 shrink mu eRef
-	| (mu == []) 	 = []
 	| (cond muPrime) = mu
 	| otherwise 	 = shrink muPrime eRef
 	where 	cond []  = True
@@ -124,7 +123,7 @@ shrink mu eRef
 
 marco :: [[Int]] -> [Int] -> [[Int]] -> [[Int]] -> [[Int]]
 marco mapping mu eRef muses
-	| (not cond) = muses
+	| (not cond) = if baseCaseCheck then muses else baseCase
 	| otherwise  = marco mapNew mu eRef newMus
 	where	cond 	= isSolution mapSol
 		mapSol	= unsafePerformIO $Picosat.solve mapping
@@ -140,7 +139,9 @@ marco mapping mu eRef muses
 		useMu lst l = if (l>0) then (lst ++ [mu!!(l-1)]) else lst
 		seedSol 	= isSolution $unsafePerformIO $Picosat.solve $eRefApplied seed
 		eRefApplied var = if (check var >0) then [[1],[-1]] else map (applyMuClause var) eRef
-                check var       = length $Prelude.filter (==[]) $map (applyMuClause var) eRef
+                check var       = length $Prelude.filter (==[]) $map (applyMuClause var) eRef	
+		baseCase	= Data.List.union muses [shrink mu eRef]
+		baseCaseCheck	= isSolution $unsafePerformIO $Picosat.solve $eRefApplied mu
 
 -- mus Function
 -- It takes mu (list of integers), eRef (in CNF form) and list of interested variables (list of integers) as the input.
@@ -173,10 +174,10 @@ pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper intLst eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper intLst eRef phiNew eNew
-	where 	phiNew 	   = if muPrimeNeg ==[] then Data.List.union phi muNeg else Data.List.union phi muPrimeNeg
+	where 	phiNew 	   = unsafePerformIO $debugPrint $if muPrimeNeg ==[] then Data.List.union phi muNeg else Data.List.union phi muPrimeNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
-		muSol 	   = unsafePerformIO $Picosat.solve phi 
+		muSol 	   = unsafePerformIO $debugPrint $unsafePerformIO $Picosat.solve phi 
 		muNeg	   = [map (* (-1)) muIntLst]
 		muPrime    = musfun mu eRef intLst
 		muPrimeNeg = map (map (* (-1))) muPrime
