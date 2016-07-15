@@ -173,12 +173,15 @@ pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper intLst eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper intLst eRef phiNew eNew
-	where 	phiNew 	   = Data.List.union phi muNeg
+	where 	phiNew 	   = if muPrimeNeg ==[] then Data.List.union phi muNeg else Data.List.union phi muPrimeNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
 		muSol 	   = unsafePerformIO $Picosat.solve phi 
-		muNeg	   = [map (* (-1)) mu]
+		muNeg	   = [map (* (-1)) muIntLst]
 		muPrime    = musfun mu eRef intLst
 		muPrimeNeg = map (map (* (-1))) muPrime
 		mu	   = fromSolution muSol
-
+		muIntLst   = Prelude.filter (/=0) $map onlyInterested mu
+                onlyInterested l  
+                        | (isJust $findIndex (==abs(l)) intLst) = l
+                        | otherwise                             = 0
