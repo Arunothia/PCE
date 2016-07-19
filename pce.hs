@@ -174,10 +174,10 @@ pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
 pceHelper intLst eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper intLst eRef phiNew eNew
-	where 	phiNew 	   = unsafePerformIO $debugPrint $if muPrimeNeg ==[] then Data.List.union phi muNeg else Data.List.union phi muPrimeNeg
+	where 	phiNew 	   = if muPrimeNeg ==[] then Data.List.union phi muNeg else Data.List.union phi muPrimeNeg
 		eNew	   = Data.List.union e muPrimeNeg
 		z 	   = isSolution muSol
-		muSol 	   = unsafePerformIO $debugPrint $unsafePerformIO $Picosat.solve phi 
+		muSol 	   = unsafePerformIO $Picosat.solve phi 
 		muNeg	   = [map (* (-1)) muIntLst]
 		muPrime    = musfun mu eRef intLst
 		muPrimeNeg = map (map (* (-1))) muPrime
