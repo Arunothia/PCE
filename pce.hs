@@ -43,6 +43,16 @@ debugPrint x = do
                 _ <- print x
                 return x
 
+--isIn Function
+
+isIn :: [Int] -> Int -> Bool
+isIn lst l = isJust $findIndex (==l) lst
+
+--isNotIn Function
+
+isNotIn :: [Int] -> Int -> Bool
+isNotIn lst l = not $isJust $findIndex (==l) lst 
+
 -- dnfToCNF Function
 -- Takes a DNF form and converts it to a CNF form using Tseytin transformation
 
@@ -68,21 +78,6 @@ f m tempLst l
 	| otherwise                  = (Data.List.union tempLst [l])
 
 ------------------------------------------------------------------------------------------------------------
-
--- In this code, we are exploring the following algorithm to estimate the Propagation Complete Encodings for SAT Solvers.
-{-	phi = negation(eRef)
-	while phi is Satisfiable
-		Let mu be the total assignment that satisfies phi
-		mu' 	= MUS(mu) w.r.t eRef
-		E 	= and E negation(mu')
-		phi 	= and phi negation(mu')	 
--}
--- The above will be done using the Picosat SAT Solver as the pce function (for the main algorithm)
--- And mus function for finding  Minimal Unsatisfiable Subsets is done by taking reference of the paper -
--- "Enumerating Infeasibility: Finding Multiple MUSes Quickly"
- 
-------------------------------------------------------------------------------------------------------------
-
 -- Grow Function
 -- It takes the original assignment, eRef and the unsatisfying clause set mu as the input.
 -- It outputs the grown assignment that acts as the MSS
@@ -158,19 +153,37 @@ musfun mu eRef intLst = marco [] muNew eRef []
 
 ------------------------------------------------------------------------------------------------------------
 
--- pce Function
+-- In this code, we are exploring the following algorithm to estimate the Propagation Complete Encodings for SAT Solvers.
+{-      phi = negation(eRef)
+        while phi is Satisfiable
+                Let mu be the total assignment that satisfies phi
+                mu'     = MUS(mu) w.r.t eRef
+                E       = and E negation(mu')
+                phi     = and phi negation(mu')
+-}
+-- The above will be done using the Picosat SAT Solver as the pce function (for the main algorithm)
+-- And mus function for finding  Minimal Unsatisfiable Subsets is done by taking reference of the paper -
+-- "Enumerating Infeasibility: Finding Multiple MUSes Quickly"
+
+{-This method does NOT work, as by marking off any MUS, we might lose to explore some other MUS that always has this MUS as a part of all its solution. Hence, we try an alternate algorithm as given below.
+-}
+------------------------------------------------------------------------------------------------------------
+
+-- pceWrong Function (Does NOT compute correct answer)
 -- It takes List of Interested variables (list of integers).
 -- It takes List of list of integers as input that represent the CNF of eRef
 -- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
 -- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRef
 
-pce :: [Int] -> [[Int]] -> [[Int]] -> [[Int]]
-pce intLst eRef dnfPhi = Prelude.filter (/=[]) z
+pceWrong :: [Int] -> [[Int]] -> [[Int]] -> [[Int]]
+pceWrong intLst eRef dnfPhi = Prelude.filter (/=[]) z
 	where 	z      = pceHelper intLst eRef (dnfToCNF n dnfPhi) []
 		n      = maximum (map maximum phiAbs)
 		phiAbs = map (map abs) dnfPhi 
 
 pceHelper :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pceHelper [] _ _ _  = []
+pceHelper _ _ []  _ = []
 pceHelper intLst eRef phi e
 	| (not z)   = e
 	| otherwise = pceHelper intLst eRef phiNew eNew
@@ -186,3 +199,58 @@ pceHelper intLst eRef phi e
                 onlyInterested l  
                         | (isJust $findIndex (==abs(l)) intLst) = l
                         | otherwise                             = 0
+
+------------------------------------------------------------------------------------------------------------
+{- Here, we try an alternate algorithm as follows
+	phi : unexplored partial assignments 
+	phiInitial = ((-xTrue Or -xFalse) | x in interestedVariables) ++ (Or (xTrue Or xFalse) for all x in interestedVariables)
+	Find mu - a Partial Assignment satisfying phi
+	check whether (Eref and Mu) is SAT
+		If UNSAT
+			Shrink mu to get MUS
+			phiPrime = Phi and (Or (-xV | xV is given in mu))
+		Else
+			muSAT = solution (Eref and Mu)
+			muS   = MSS(muSAT)
+			phiPrime = Phi and (MCS)
+-}
+-- pce Function 
+-- It takes List of Interested variables (list of integers).
+-- It takes List of list of integers as input that represent the CNF of eRef
+-- It takes List of list of integers as input that represent the CNF of phi (as given in algorithm)
+-- It outputs List of list of integers that represent the CNF of the Propagation complete form of eRefa
+
+pce :: [Int] -> [[Int]] -> [[Int]] -> [[Int]] -> [[Int]]
+pce intLst eRef phi e
+        | (not cond) 	= e
+        | otherwise 	= pce intLst eRef phiNew eNew
+	where	phiNew	= if isSAT then (Data.List.union phi blockSAT) else (Data.List.union phi blockUnSAT)
+		eNew	= if isSAT then e else (Data.List.union e musNeg)
+		musNeg	= [map (* (-1)) musUnSat]
+		blockUnSAT   = [map negUnSat musUnSat]
+		blockSAT     = [map negSat musSat]
+		musUnSat     = shrink muFormatted eRef
+		musSat	     = shrink (Prelude.filter ((isIn intLst).abs) muSAT) (dnfToCNF m $map (map (* (-1))) eRef) 
+		isSAT 	= isSolution $unsafePerformIO $Picosat.solve (Data.List.union eRef $map (\x->[x]) muFormatted)
+		muSAT	= fromSolution $unsafePerformIO $Picosat.solve (Data.List.union eRef $map (\x->[x]) muFormatted)
+		muFormatted     = Prelude.filter (/=0) $zipWith assign mu1 mu2
+		mu    	= fromSolution muSol
+		cond  	= isSolution muSol
+		muSol 	= unsafePerformIO $Picosat.solve phi
+		(mu1, mu2)	= splitAt ((length mu) `div` 2) mu
+		assign	p q
+			| (p<0 && q<0)	= 0
+			| (p<0)	       	= -(intLst!!(abs(p)-1))
+			| (q<0)	      	= (intLst!!(p-1))
+			| otherwise   	= error "Error: xTrue and xFalse simultaneously true" 
+		negSat l
+                        |(l<0)          = (fromJust $findIndex (==abs(l)) intLst) + 1
+                        | otherwise     = (n+(fromJust $findIndex (==abs(l)) intLst) + 1)
+
+		negUnSat l
+                 	|(l<0)      	= -(n+(fromJust $findIndex (==abs(l)) intLst) + 1)
+                 	| otherwise 	= -((fromJust $findIndex (==abs(l)) intLst) + 1)
+		n		= length intLst
+		m      		= maximum (map maximum eRefAbs)
+                eRefAbs 	= map (map abs) eRef
+

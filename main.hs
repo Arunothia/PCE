@@ -26,12 +26,13 @@ main = do
         	putStrLn "*** PCE Implemented in Haskell ***"
 		putStrLn "Enter the variables of interest (list of integers)"
                 intLst <- readInt
+		let n = length intLst
 		putStrLn "Enter E_ref (Each clause is space seperated literals) and the clauses are seperated by ','"
                 inputERef <- getLine
                 let tmp  = splitOneOf "," inputERef
                 let eRef = (Prelude.map ((Prelude.map read).words) tmp)
-                let dnfPhi  = map (map (* (-1))) eRef
-
-        	let answer = pce intLst eRef dnfPhi
+                let phiIni = map f [1..n] 	-- We use the integer value of the variable for xTrue and n+ that for xFalse
+			where f l = [-l,-(n+l)]
+        	let answer = pce intLst eRef phiIni []
         	_  <- print answer
        		print $length answer
