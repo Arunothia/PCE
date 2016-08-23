@@ -4,5 +4,9 @@ ANY OTHER NUMBER: PCE
 *** PCE Implemented in Haskell ***
 Enter the variables of interest (list of integers)
 Enter E_ref (Each clause is space seperated literals) and the clauses are seperated by ','
+1581000000
 [[4,5,-3],[2,-5,3],[4,-2,-3],[-2,5,-3],[-4,-5,3],[-4,2,3]]
-6
+[[4,5,-3],[2,-5,3],[4,-2,-3],[-2,5,-3],[-4,-5,3],[-4,2,3]]
+7187000000
+(6,6)
+0

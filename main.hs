@@ -2,6 +2,7 @@ module Main where
 import PCE
 import Data.List.Split
 import Data.List
+import System.CPUTime
 
 readInt :: IO [Int]
 readInt = fmap (Prelude.map read. Prelude.words) getLine
@@ -34,5 +35,12 @@ main = do
                 let phiIni = map f [1..n] 	-- We use the integer value of the variable for xTrue and n+ that for xFalse
 			where f l = [-l,-(n+l)]
         	let answer = pce intLst eRef phiIni []
-        	_  <- print answer
-       		print $length answer
+		tIni <- getCPUTime
+                _ <- print tIni
+                _  <- print answer
+                let ans = redundancyRemover answer
+		_ <- print ans
+		tFin <- getCPUTime
+                _ <- print tFin
+                _ <- print ((length answer), (length ans))
+                print ((tFin - tIni) `div` 1000000000000)

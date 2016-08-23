@@ -43,6 +43,12 @@ debugPrint x = do
                 _ <- print x
                 return x
 
+--makePA Function
+
+makePA :: [PAValue] -> PA
+makePA x = PA $Just x
+
+
 --isIn Function
 
 isIn :: [Int] -> Int -> Bool
@@ -76,6 +82,143 @@ f m tempLst l
 	| (isJust $findIndex (==l) m)    = [-1,1]
 	| (isJust $findIndex (==(-l)) m) = tempLst
 	| otherwise                  = (Data.List.union tempLst [l])
+
+------------------------------------------------------------------------------------------------------------
+
+-- Data Type PAValue helps to define our partial assignment. It can be (True|False|Question).
+
+data PAValue = PAFalse | PATrue | PAQuest
+                deriving (Eq, Read, Show)
+
+paValue :: PAValue -> Int
+paValue PAFalse = -1
+paValue PATrue  = 1
+paValue PAQuest = 0
+
+-- PA - The Type of Partial Assignment we will be dealing with
+
+newtype PA = PA (Maybe([PAValue]))
+                deriving (Eq, Read, Show)
+
+-- To undo PA constructor use unPA Function
+
+unPA :: PA -> Maybe([PAValue])
+unPA (PA v) = v
+
+-- lessThanPA Function 
+
+lessThanPA :: PA -> PA -> Bool
+lessThanPA (PA Nothing)  _              = False
+lessThanPA (PA (Just p)) (PA Nothing)   = True
+lessThanPA (PA (Just p)) (PA (Just q))  = ((length $Prelude.filter (==False) $zipWith isLessThan p q) == 0)
+
+-- isLessThan Function
+
+isLessThan :: PAValue -> PAValue -> Bool
+isLessThan PAQuest PAQuest = True
+isLessThan PAQuest _       = False
+isLessThan _ PAQuest       = True
+isLessThan p q             = if (p==q) then True else False
+
+-- The following defines an order on Partial Assignments (The more undefined, higher the value)
+-- The order should be more defined than just count of PAQuest, refer definition 
+
+instance Ord PA where
+  _ `compare` (PA Nothing) = GT
+  (PA Nothing) `compare` _ = LT
+  PA (Just p) `compare` PA (Just q)
+        | (z /= EQ) = z
+        | otherwise = zOrd
+        where   z = length(Prelude.filter (== PAQuest) p) `compare` length(Prelude.filter (== PAQuest) q)
+                px = findIndices (== PATrue) p
+                qx = findIndices (== PATrue) q
+                py = Data.List.map (+ lth) $findIndices (== PAFalse) p
+                qy = Data.List.map (+ lth) $findIndices (== PAFalse) q
+                pz = Data.List.union px py
+                qz = Data.List.union qx qy
+                lth = length p
+                zOrd = qz `compare` pz
+------------------------------------------------------------------------------------------------------------
+
+-- paTop is the fully unidentified partial assignment.
+-- Partial Assignment in this code is defined by the data type Maybe [PAValue]
+
+paTop :: Int -> PA
+paTop 0 = error "[paTop:] Empty Vocabulary"
+paTop n = PA $Just (replicate (fromIntegral n) PAQuest)
+
+------------------------------------------------------------------------------------------------------------
+
+-- assign Function defines a partial assignment when a literal is specified.
+-- Its first integer input stands for 'n' - that denotes the vocabulary.
+-- It takes an integer (negative for negated variables) and returns a partial assignment.
+-- When the integer passed is zero(which should'nt be the case),the partial assignment returned marks all literals a contradiction.
+
+assign :: Int -> Int -> PA
+assign n 0 = error "[assign:] Literal value cannot be '0'"
+assign 0 _ = error "[assign:] Empty Vocabulary"
+assign n l
+        | (abs(l) > n) = error "Invalid Literal"
+        | (l > 0) = PA $Just(init(first) ++ [PATrue] ++ second)
+        | otherwise = PA $Just(init(first) ++ [PAFalse] ++ second)
+        where  (first,second) = Data.List.splitAt (fromIntegral(abs(l))) (fromJust $unPA (paTop n))
+
+------------------------------------------------------------------------------------------------------------
+
+-- paMeet Function defines the 'meet' operator for combining two partial assignments.
+-- If the two partial assignments lead to a contradiction, then we return Nothing (denoting contradiction).
+-- Otherwise we return the unification of the two partial assignments.
+
+
+paMeet :: PA -> PA -> PA
+paMeet _ (PA Nothing) = PA Nothing
+paMeet (PA Nothing) _ = PA Nothing
+paMeet (PA (Just p)) (PA (Just q)) = PA $ sequence unifiedPA
+        where unifiedPA = zipWith unifyPA p q
+              unifyPA a b
+                | (a == b) = (Just a)
+                | (a == PAQuest) = (Just b)
+		| (b == PAQuest) = (Just a)
+                | otherwise = Nothing
+
+------------------------------------------------------------------------------------------------------------
+
+-- up(c) Function defines a unit propagation function that takes a partial assignment to another partial assignment.
+-- It takes a list of integers (that represents a clause) as input.
+-- It takes an integer 'n' - that is the vocabulary value.
+
+up :: Int -> [Int] -> PA -> PA
+up _ _ (PA Nothing)  = (PA Nothing)
+up n c (PA (Just p))
+        | (((length c) -1 ==paFalseCount)&&(paQuestCount ==1))
+                                           = paMeet (assign n (c!!(fromJust(findIndex (==PAQuest) paValueListOfC)))) (PA (Just p))
+        | otherwise                                            = (PA (Just p))
+                where   paQuestCount = length (Prelude.filter (==PAQuest) paValueListOfC)
+                        paFalseCount = length (Prelude.filter (==PAFalse) paValueListOfC)
+                        paValueListOfC = Data.List.map (assignPAValueToL . fromIntegral) c
+                        assignPAValueToL l
+                                | (l > n || l < -n) = error "Literal value crossed n"
+                                | (l > 0) = p !! (l-1)
+                                | (l == 0) = error "[up:] Literal Value cannot be '0'"
+                                | otherwise = invertPAValue (p !! (abs(l)-1))
+                        invertPAValue v
+                                | (v == PAFalse) = PATrue
+                                | (v == PATrue) = PAFalse
+                                | otherwise = v
+
+------------------------------------------------------------------------------------------------------------
+
+-- gfpUP Function - Greatest Fixed Point of applying up(c) for each clause in the encoding.
+-- It takes the vocabulary value 'n', a set of clauses (List of list of integers) and a partial assignment as the input.
+-- It outputs the GFP of unit propagation as mentioned in the paper.
+
+gfpUP :: Int -> [[Int]] -> PA -> PA
+gfpUP n setC p = greatestFP p
+        where greatestFP q
+                | (q == (bigPAMeet setC q)) = q
+                | otherwise = greatestFP (bigPAMeet setC q)
+              bigPAMeet [] q = q
+              bigPAMeet (c:rest) q = bigPAMeet rest (up n c q)
 
 ------------------------------------------------------------------------------------------------------------
 -- Grow Function
@@ -201,7 +344,8 @@ pceHelper intLst eRef phi e
                         | otherwise                             = 0
 
 ------------------------------------------------------------------------------------------------------------
-{- Here, we try an alternate algorithm as follows
+{- Here, we try an alternate algorithm whose rough logic is as follows
+
 	phi : unexplored partial assignments 
 	phiInitial = ((-xTrue Or -xFalse) | x in interestedVariables) ++ (Or (xTrue Or xFalse) for all x in interestedVariables)
 	Find mu - a Partial Assignment satisfying phi
@@ -253,4 +397,51 @@ pce intLst eRef phi e
 		n		= length intLst
 		m      		= maximum (map maximum eRefAbs)
                 eRefAbs 	= map (map abs) eRef
+
+
+------------------------------------------------------------------------------------------------------------
+
+-- redundancyRemover Function removes the redundant clauses from the given encoding.
+-- Note that, this function guarentees only a minimal encoding as the output and not the absolute least (as the outcome will depend on the processing order).
+-- It takes an encoding and returns the encoding after removing redundant clauses, if any.
+
+redundancyRemover :: [[Int]] -> [[Int]]
+redundancyRemover e = redundancyRemoverHelper 0 (length e) n e
+	where	n    = maximum (map maximum eAbs)
+                eAbs = map (map abs) e
+
+redundancyRemoverHelper :: Int -> Int -> Int -> [[Int]] -> [[Int]]
+redundancyRemoverHelper _ _ _ [] = []		
+redundancyRemoverHelper l m n e
+	| (l<m)     = if ch then x else y
+	| otherwise = e
+		where 	ch   = checkClause n rest c
+			x    = redundancyRemoverHelper l (m-1) n rest
+			y    = redundancyRemoverHelper (l+1) m n e
+			c    = e!!l
+			rest = Prelude.filter (/= c) e
+ 
+------------------------------------------------------------------------------------------------------------
+
+-- checkClause Function checks whether the given clause is redundant or not w.r.t the rest of the encoding.
+-- The function takes the value 'n', the rest of the encoding and the clause as input and outputs True or False as desired.
+
+checkClause :: Int -> [[Int]] -> [Int] -> Bool
+checkClause _ e [] = True
+checkClause n e c  = length(Prelude.filter (==True) $zipWith (==) oldPAList newPAList) == 0
+        where   newPAList = Data.List.map (fromJust . unPA . (gfpUP n e)) (Data.List.map makePA oldPAList)
+                oldPAList = Data.List.map markLitQuest c
+                markLitQuest x     = Data.List.map (matchLit x) [1..n]
+                matchLit x l
+                        | (abs(x) == l) = PAQuest
+                        | (index l == Nothing)= PAQuest
+                        | (c!!(fromJust(index l)) > 0)  = PAFalse
+                        | (c!!(fromJust(index l)) < 0)  = PATrue
+                        | otherwise = error "Error, 0 appeared"
+                index l = getOrIndex (findIndex (==l) c) (findIndex (==(-l)) c)
+                getOrIndex Nothing Nothing   = Nothing
+                getOrIndex Nothing (Just a)  = Just a
+                getOrIndex (Just a) Nothing  = Just a
+                getOrIndex (Just a) (Just b) = error "Error,Literal found in both negated and abs form"
+------------------------------------------------------------------------------------------------------------
 
